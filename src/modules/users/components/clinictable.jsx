@@ -1,21 +1,36 @@
 import React from 'react';
-import { Box, CircularProgress, Divider, FormControl, IconButton, InputAdornment, InputLabel, Menu, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography } from '@mui/material';
+import { Box, 
+        CircularProgress, 
+        Divider, 
+        IconButton, 
+        InputAdornment, 
+        Menu, 
+        MenuItem, 
+        Paper, 
+        Table, 
+        TableBody, 
+        TableCell, 
+        TableContainer, 
+        TableHead, 
+        TablePagination, 
+        TableRow, 
+        TextField } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CreateIcon from '@mui/icons-material/Create';
 
-import { collection, deleteDoc, doc, getDocs, query, where } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDocs} from "firebase/firestore";
 import { db, functions } from '@/app/firebaseConfig';
 import PatientModal from './editpatientcard';
 import { httpsCallable } from 'firebase/functions';
-
-import { useRouter } from 'next/navigation';
-import { useUser } from '../../../../context/UserContext';
-import ChangePassword from './changepassword';
-
+import AccountCard from '@/modules/welcome/components/accountcard';
+import ClinicModal from './clinicmodal';
+import ClinicEditModal from './editcliniccard';
 
 function SearchBar({ onSearchChange }){
     return(
-        <Box sx={{width: '80vw'}}>
+        <Box sx={{width: '100%'}}>
             <TextField
                 sx={{
                     background: 'rgba(0,0,0,0.1)',
@@ -29,7 +44,7 @@ function SearchBar({ onSearchChange }){
                 }}
                 variant='outlined'
                 color='secondary'
-                placeholder='Search for patients'
+                placeholder='Search for clinics'
                 fullWidth
                 InputProps={{
                     endAdornment: (
@@ -46,18 +61,6 @@ function SearchBar({ onSearchChange }){
     )
 }
 
-async function getAllUsersFromFirestore(clinicId){
-    const usersRef = collection(db, "users");
-    const querySnapshot = await getDocs(query(collection(db, "users"), where("role", "==", 0), where("clinic", "==", clinicId)));
-    let users = [];
-    
-    querySnapshot.forEach((doc) => {
-        const userData = doc.data();
-        users.push({ id: doc.id, ...userData});
-    });
-
-    return users;
-}
 
 async function deleteUser(userId) {
     try {
@@ -68,55 +71,32 @@ async function deleteUser(userId) {
     }
 }
 
-async function getAllDoctorsFromFirestore(clinicId){
-    const usersRef = collection(db, "users");
-    const querySnapshot = await getDocs(query(collection(db, "users"), where("role", "==", 1)));
-    let users = [];
-    
-    querySnapshot.forEach((doc) => {
-        const userData = doc.data();
-        users.push({ id: doc.id, ...userData});
-    });
+async function getClinicList(){
+    const clinicSnapshot = await getDocs(collection(db, "clinics"));
 
-    return users;
-}
+    let clinics = [];
 
-function mapDoctorsToUsers(users, doctors) {
-    return users.map(user => {
-        const assignedDoctor = doctors.find(doctor => doctor.id === user.doctor);
+    clinicSnapshot.forEach((doc) => {
+        const clinicData = doc.data();
+        clinics.push({ id: doc.id, ...clinicData});
+    })
 
-        return {
-            ...user,
-            doctor: assignedDoctor ? `Dr. ${assignedDoctor.firstName} ${assignedDoctor.lastName}`.trim() : 'Unassigned',
-            doctor_id: assignedDoctor ? assignedDoctor.id : null
-        };
-    });
+    return clinics;
 }
 
 
-function DataTable() {
-    const { userData } = useUser();
+function ClinicTable() {
     const [searchQuery, setSearchQuery] = React.useState('');
     const [isLoading, setisLoading] = React.useState(true);
-    const [userList, setUserList] = React.useState([]);
+    const [clinicList, setClinicList] = React.useState([]);
     const [selectedPatient, setSelectedPatient] = React.useState({});
     const [page, setPage] = React.useState(0);
     const [rowsPerPage, setRowsPerPage] = React.useState(10);
+
     const [isModalOpen, setModalOpen] = React.useState(false);
-    const [isPassModalOpen, setPassModalOpen] = React.useState(false);
-
-    const [doctorFilter, setDoctorFilter] = React.useState('');
-    const [doctorOptions, setDoctorOptions] = React.useState([]);
-
-
-    const router = useRouter();
-
+    const [isAccountModalOpen, setAccountModalOpen] = React.useState(false);
     const [anchorEl, setAnchorEl] = React.useState(null);
     const open = Boolean(anchorEl);
-
-    const handlePatientPage = () =>{
-        router.push(`/patient?id=${selectedPatient.uid  }`);
-    }
 
     const handleClick = (row) => (event) => {
         setSelectedPatient(row);
@@ -128,11 +108,12 @@ function DataTable() {
     };
 
     const fetchData = async () => {
+
+        setisLoading(true);
+
         try {
-            const users = await getAllUsersFromFirestore(userData.clinic);
-            const doctors = await getAllDoctorsFromFirestore();
-            setUserList(mapDoctorsToUsers(users, doctors));
-            setDoctorOptions(doctors.map(doctor => ({ label: `Dr. ${doctor.firstName} ${doctor.lastName}`, value: doctor.id })));
+            const clinics = await getClinicList();
+            setClinicList(clinics);
         } catch (error) {
             console.error("Error fetching data:", error);
         } finally{
@@ -142,7 +123,7 @@ function DataTable() {
 
     React.useEffect(() => {
         fetchData();
-    }, [searchQuery, doctorFilter]);
+    }, []);
 
     const handleChangePage = (event, newPage) => {
         setPage(newPage);
@@ -158,24 +139,18 @@ function DataTable() {
         handleClose();
     };
 
+    const handleOpenModal = () => setModalOpen(true);
     const handleCloseModal = () => setModalOpen(false);
 
-    const handlePassModalOpen = () =>{
-        setPassModalOpen(true);
-        handleClose();
-    }
-
-    const handlePassModalClose = () => setPassModalOpen(false);
+    const handleOpenAccountModal = () => setAccountModalOpen(true);
+    const handleCloseAccountModal = () => setAccountModalOpen(false);
 
     const handleDelete = async () => {
         const isConfirmed = window.confirm("Are you sure you want to delete this user account?");
     
         if (isConfirmed) {
-            const deleteUserAccount = httpsCallable(functions, 'deleteUserAccount');
-        
             try {
                 await deleteUserAccount({ uid: selectedPatient.id });
-                await deleteUser(selectedPatient.id);
                 alert("User account deleted successfully");
                 handleClose();
                 fetchData();
@@ -189,60 +164,48 @@ function DataTable() {
         }
     };
 
-    React.useEffect(() => {
-        fetchData();
-    }, [searchQuery]); // Include searchQuery as a dependency
-
-    // Filter userList based on searchQuery
-    const filteredUsers = userList.filter((user) => {
-        const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
-        const matchesSearchQuery = fullName.includes(searchQuery.toLowerCase()) ||
-                                   user.email.toLowerCase().includes(searchQuery.toLowerCase());
-
-        const matchesDoctorFilter = doctorFilter ? user.doctor_id === doctorFilter : true;
-
-        return matchesSearchQuery && matchesDoctorFilter;
-    });
-
-    const handleDoctorFilterChange = (event) => {
-        setDoctorFilter(event.target.value);
+    const getFilteredClinics = () => {
+        return clinicList.filter((clinic) => {
+            return (
+                clinic.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                clinic.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                clinic.contact.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                clinic.email.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        });
     };
 
-    const displayedUsers = filteredUsers
+    const filteredClinics = React.useMemo(getFilteredClinics, [clinicList, searchQuery]);
+
+    const displayedClinics = filteredClinics
         .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
-    // const displayedUsers = userList.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+    // React.useEffect(() => {
+    //     fetchData();
+    // }, []);
+
+    // const displayedClinics = clinicList.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
     return (
-        <Paper sx={{ background: 'white' }}>
-            <PatientModal
+        <Paper sx={{ background: 'white'}}>
+            <ClinicEditModal
                 open={isModalOpen}
                 setClose={handleCloseModal}
                 patient={selectedPatient}
             />
-            <ChangePassword 
-                open={isPassModalOpen}
-                setClose={handlePassModalClose}
-                patient={selectedPatient}
-            />
-            <Box sx={{ p: 4 }}>
+            <Box sx={{ p: 4, display:'flex', gap: 1, alignItems:'center' }}>
                 <SearchBar onSearchChange={setSearchQuery} />
-            </Box>
-            <Box sx={{px: 4, display: 'flex', alignItems:'center', gap: 2, mb: 2}}>
-                <Typography sx={{fontWeight:'bold'}}>Filters: </Typography>
-                <FormControl size='small' sx={{ minWidth: 120 }}>
-                    <InputLabel>Doctor</InputLabel>
-                    <Select
-                        label='Doctor'
-                        value={doctorFilter}
-                        onChange={handleDoctorFilterChange}
-                    >
-                        <MenuItem value=''><em>None</em></MenuItem>
-                        {doctorOptions.map(option => (
-                            <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
+                {/* <IconButton onClick={handleOpenAccountModal}>
+                    <CreateIcon/>
+                </IconButton>
+                <ClinicModal
+                    open={isAccountModalOpen}
+                    setClose={handleCloseAccountModal}
+                />
+                <IconButton onClick={fetchData}>
+                    <RefreshIcon/>
+                </IconButton> */}
+
             </Box>
             <Divider sx={{ mx: 4 }} />
             <Box sx={{ px: 4 }}>
@@ -253,28 +216,26 @@ function DataTable() {
                 ) : (
                 <>
                 <TableContainer component={Paper}>
-                    <Table sx={{ minWidth: 650 }} aria-label="simple table">
+                    <Table sx={{ minWidth: 550 }} aria-label="simple table">
                         <TableHead>
                             <TableRow>
                                 <TableCell>Name</TableCell>
-                                <TableCell align="right">Email</TableCell>
+                                <TableCell align="right">Address</TableCell>
                                 <TableCell align="right">Contact</TableCell>
-                                <TableCell align="right">Doctor Assigned</TableCell>
+                                <TableCell align="right">Email</TableCell>
                                 <TableCell align="right"></TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {displayedUsers.map((row) => (
+                            {displayedClinics.map((row) => (
                                 <TableRow
                                     key={row.id}
                                     sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
                                 >
-                                    <TableCell component="th" scope="row">
-                                        {row.firstName || row.lastName ? `${row.firstName} ${row.lastName}`.trim() : '---'}
-                                    </TableCell>
-                                    <TableCell align="right">{row.email || '---'}</TableCell>
+                                    <TableCell component="th" scope="row">{row.name || '---'}</TableCell>
+                                    <TableCell align="right">{row.address || '---'}</TableCell>
                                     <TableCell align="right">{row.contact || '---'}</TableCell>
-                                    <TableCell align="right">{row.doctor || 'Unassigned'}</TableCell>
+                                    <TableCell align="right">{row.email || '---'}</TableCell>
                                     <TableCell align="right">
                                         <IconButton onClick={handleClick(row)}>
                                             <MoreVertIcon/>
@@ -293,10 +254,8 @@ function DataTable() {
                                             open={open}
                                             onClose={handleClose}
                                         >
-                                            <MenuItem onClick={handlePatientPage}>View Patient Page</MenuItem>
-                                            <MenuItem onClick={handleOpen}>Edit</MenuItem>
-                                            <MenuItem onClick={handlePassModalOpen}>Change Account Password</MenuItem>
-                                            <MenuItem onClick={handleDelete}>Delete Account</MenuItem>
+                                            <MenuItem onClick={handleOpen}>Edit Clinic Information</MenuItem>
+                                            <MenuItem onClick={handleDelete}>Delete Clinic</MenuItem>
                                         </Menu>
                                     </TableCell>
                                 </TableRow>
@@ -306,7 +265,7 @@ function DataTable() {
                 </TableContainer>
                 <TablePagination
                     component="div"
-                    count={userList.length}
+                    count={clinicList.length}
                     page={page}
                     onPageChange={handleChangePage}
                     rowsPerPage={rowsPerPage}
@@ -319,4 +278,4 @@ function DataTable() {
     );
 }
 
-export default DataTable;
+export default ClinicTable;

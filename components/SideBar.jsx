@@ -10,61 +10,55 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
 import SpaceDashboardOutlinedIcon from '@mui/icons-material/SpaceDashboardOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import MessageIcon from '@mui/icons-material/Message';
 
-import { auth, db } from '../src/app/firebaseConfig';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { UserAuth } from '../context/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
+import { useUser } from '../context/UserContext';
 
-
-export default function SideBar(){
+export default function SideBar({ isOpen, toggleSidebar }) {
     const [drawerWidth, setDrawerWidth] = React.useState(80);
     const router = useRouter();
     const currentPath = usePathname();
-    const { user, logOut } = UserAuth();
-    const [mobileOpen, setMobileOpen] = React.useState(true);
+    const { logOut } = UserAuth();
+    const { userData } = useUser();
     const [isLoading, setisLoading] = React.useState(false);
+    const [patientHidden, setPatientHidden] = React.useState(true);
 
-    const listItems = [
+    const originalListItems = [
         { icon: <SpaceDashboardOutlinedIcon fontSize='large'/>, key: 'Dashboard', route: 'welcome' },
         { icon: <PersonOutlineOutlinedIcon fontSize='large'/>, key: 'Patients', route: 'patients' },
-        { icon: <SettingsOutlinedIcon fontSize='large'/>, key: 'Settings', route:'settings' },
+        { icon: <MessageIcon fontSize='large'/>, key: 'Message', route:'messages' },
     ];
+    
+    // let listItems = patientHidden 
+    //     ? originalListItems.filter(item => item.key !== 'Patients' && item.key !== 'Message')
+    //     : originalListItems;
 
-    React.useEffect(()=>{
-        console.log('Current Path: ',currentPath);
-    },[])
+    // React.useEffect(()=>{
+    //     if (userData?.role === 3) {
+    //         setPatientHidden(true);
+    //     } else {
+    //         setPatientHidden(false);
+    //     }
+    // }, [userData]);
 
     const handleDrawerToggle = () => {
-      setMobileOpen(!mobileOpen);
-      if(drawerWidth == 240){
-        setDrawerWidth(80);
-      } else {
-        setDrawerWidth(240);
-      }
+        toggleSidebar();
+        setDrawerWidth(isOpen ? 240 : 80);
     };
+
+    React.useEffect(()=>{
+        setDrawerWidth(isOpen ? 240 : 80);
+    },[isOpen]);
 
     const handleSignOut = async () => {
         try{
             await logOut();
             router.push("/login");
         } catch(error) {
-            console.log(error);
         }
     };
-
-    // React.useEffect(() => {
-    //     const checkAuthentication = async () => {
-    //       await new Promise((resolve) => setTimeout(resolve, 200));
-    //       if (user == null){
-    //         await logOut();
-    //         router.push("/login");
-    //       }
-    //       console.log(user);
-    //       setisLoading(false);
-    //     };
-    //     checkAuthentication();
-    //   }, [user]);
     
     const handleNavigation = (route) => {
         return () => {
@@ -96,7 +90,7 @@ export default function SideBar(){
         </Box>
         <Divider/>
         <List sx={{ flex: 1, overflowX: 'hidden' }}>
-            {listItems.map(item => (
+            {originalListItems.map(item => (
                 <ListItem key={item.key} sx={{ mb: 2 }}>
                     <ListItemButton
                         onClick={handleNavigation(item.route)}
@@ -170,7 +164,7 @@ export default function SideBar(){
         </Box>
         <Divider/>
         <List sx={{ flex: 1, overflowX: 'hidden' }}>
-            {listItems.map(item => (
+            {originalListItems.map(item => (
                 <ListItem key={item.key} sx={{ mb: 2 }}>
                     <ListItemButton
                         onClick={handleNavigation(item.route)}
@@ -217,7 +211,7 @@ export default function SideBar(){
 
     return(
         isLoading ? null : (
-            <Box>
+            <Box onClick={(e) => e.stopPropagation()}>
                 <Drawer
                     variant="permanent"
                     sx={{
@@ -225,7 +219,7 @@ export default function SideBar(){
                         '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, transition: 'width .3s ease-in-out' },
                     }}
                 >
-                    {mobileOpen ? (
+                    {!isOpen ? (
                         <>
                         {drawerClose}
                         </>

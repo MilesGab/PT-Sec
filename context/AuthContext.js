@@ -22,17 +22,6 @@ export const AuthContextProvider = ({ children }) => {
     signInWithPopup(auth, provider);
   };
 
-
-//   const logIn = async (email, password) => {
-//     try {
-//         await signInWithEmailAndPassword(auth, email, password);
-//         router.push("/welcome");
-//     } catch (error) {
-//         console.error('Login Error:', error);
-//     }
-//     };
-
-
   const logOut = () => {
     signOut(auth);
   };
@@ -40,9 +29,13 @@ export const AuthContextProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      if (!currentUser) {
+        router.push("/login");
+      } else {
+      }
     });
     return () => unsubscribe();
-  }, [user]);
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, googleSignIn, logOut }}>

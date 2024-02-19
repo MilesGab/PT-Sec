@@ -7,81 +7,75 @@ import HttpsIcon from '@mui/icons-material/Https';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useRouter } from 'next/navigation';
+import PTIcon from '../../app/favicon.ico';
+import Image from 'next/image';
+import { setPersistence, browserLocalPersistence, signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from '../firebaseConfig';
 
-import { collection, getDocs } from 'firebase/firestore';
-import { auth, db } from '../firebaseConfig';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { UserAuth } from '../../../context/AuthContext';
-
-async function getAllUsersFromFirestore(){
-    const usersRef = collection(db, "users");
-    const querySnapshot = await getDocs(collection(db, "users"));
-    let users = [];
-    
-    querySnapshot.forEach((doc) => {
-        const userData = doc.data();
-        users.push({ ...userData});
-    });
-
-    return users;
-}
+const ErrorMap = {
+    'Firebase: Error (auth/wrong-password).' : 'Wrong password',
+    'Firebase: Error (auth/invalid-email).' : 'Please use a valid email.',
+    'Firebase: Error (auth/user-not-found).' : 'User does not exist in the database.'
+};
 
 export default function Login () {
-
-    const { logIn } = UserAuth();
     const router = useRouter();
     const [email, setEmail] = React.useState('');
     const [password, setPassword] = React.useState('');
     const [showPassword, setShowPassword] = React.useState(false);
     const [error, setError] = React.useState('');
-
     const [isLoading, setIsLoading] = React.useState(false);
 
     const handleClickShowPassword = () => setShowPassword((show) => !show);
   
     const handleMouseDownPassword = (event) => {
-      event.preventDefault();
+        event.preventDefault();
     };
 
-    const handleLogin = async () => {
-        if (!email && !password) {
+    const handleLogin = async (event) => {
+        event.preventDefault();
+        if (!email || !password) {
             setError('Email and password are required');
             return;
         }
-        if (!email) {
-            setError('Email is required');
-            return;
-        }
-        if (!password) {
-            setError('Password is required');
-            return;
-        }
         setIsLoading(true);
-
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
+            await setPersistence(auth, browserLocalPersistence);
+            await signInWithEmailAndPassword(auth, email, password);
             router.push("/welcome");
         } catch (error) {
             console.error('Login Error: ', error);
-            setError('Incorrect Credentials')
+            setError(error.message);
         } finally {
             setIsLoading(false);
         }
-    }
+    };
 
-    return(
-            <main className={styles.main}>
-                <Box className={styles.login_container}>
-                    <Box className={styles.form_container}>
+    return (
+        <main className={styles.main}>
+            <Box className={styles.login_container}>
+                <Box className={styles.form_container}>
+                    <Box sx={{display:'flex', alignItems:'center', gap: 2, mb: '1vh'}}>
+                        <Image src={PTIcon} width={40} alt="Pocket Therapist Icon"/>
+                        <Typography sx={{fontWeight: 500, fontSize: 20}}>Pocket Therapist</Typography>
+                    </Box>
+
+                    <Box sx={{mb: '2.5vh'}} className={styles.title_container}>
                         <Typography sx={{
-                            textAlign: 'center',
+                            textAlign: 'left',
                             fontWeight: 'bold',
                             fontSize: '32px',
                             color: 'rgb(255, 173, 51)',
-                            mb: '2.25vh'
                             }}>Log In</Typography>
-                        <FormControl sx={{gap: 1.25}}>
+                        <Typography sx={{
+                            textAlign: 'left',
+                            fontSize: '16px',
+                            color: '#696969',
+                            }}>Welcome to the Pocket Therapist Management System</Typography>
+                    </Box>
+
+                    <form onSubmit={handleLogin}>
+                        <FormControl sx={{gap: 1.25}} fullWidth>
                             <TextField
                                 variant="outlined"
                                 placeholder="Email"
@@ -91,9 +85,8 @@ export default function Login () {
                                             <EmailIcon/>
                                         </InputAdornment>
                                 }}
-                                onChange={e => {
-                                    setEmail(e.target.value);
-                                }}
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
                                 fullWidth
                             />
                             <TextField
@@ -117,22 +110,24 @@ export default function Login () {
                                             </IconButton>
                                         </InputAdornment>
                                 }}
-                                onChange={e => {
-                                    setPassword(e.target.value);
-                                }}
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
                                 fullWidth
                             />
-                            {error && <Typography color="error">{error}</Typography>}
+                            {error && <Typography color="error">{ErrorMap[error]}</Typography>}
                             <Button 
+                                type="submit" // This makes the button submit the form
+                                disableElevation
                                 variant="contained" 
                                 color="secondary"
-                                onClick={()=>handleLogin()}
-                                sx={{color:'white', mx: '8vw', py: '0.5vw', mt: '2.25vh'}}>{isLoading ? <CircularProgress size={24} /> : "Log In"}</Button>
+                                sx={{color:'white', py: '0.5vw', mt: '2.25vh', width: '100%'}}
+                            >
+                                {isLoading ? <CircularProgress size={24} /> : "Log In"}
+                            </Button>
                         </FormControl>
-                    </Box>
+                    </form>
                 </Box>
-            </main>
-    )
-
+            </Box>
+        </main>
+    );
 }
-
